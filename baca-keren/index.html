@@ -1,0 +1,1836 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Baca Keren — Sistem Rekomendasi Buku</title>
+  <style>
+    /* ============================================================
+       DESIGN TOKENS — dark / light via data-theme attribute
+       ============================================================ */
+    :root {
+      --bg:          #0f1117;
+      --surface:     #1a1d27;
+      --surface2:    #22263a;
+      --border:      #2e3348;
+      --text:        #e8eaf0;
+      --muted:       #8a90a8;
+      --accent:      #6c8ef7;
+      --accent-dim:  #3b4f9e;
+      --success:     #4caf8c;
+      --warn:        #f0a04b;
+      --danger:      #e05c6a;
+      --star:        #f0c040;
+      --radius:      10px;
+      --radius-lg:   16px;
+      --shadow:      0 4px 24px rgba(0,0,0,.45);
+      --transition:  .2s ease;
+    }
+    [data-theme="light"] {
+      --bg:          #f0f2f8;
+      --surface:     #ffffff;
+      --surface2:    #e8edf7;
+      --border:      #d0d7e8;
+      --text:        #1a1d2e;
+      --muted:       #6b7280;
+      --accent:      #3b5fd4;
+      --accent-dim:  #c7d3f8;
+      --success:     #2a8c62;
+      --warn:        #c97a1a;
+      --danger:      #c0394a;
+      --star:        #d4a010;
+      --shadow:      0 4px 24px rgba(0,0,0,.10);
+    }
+
+    /* ============================================================
+       RESET & BASE
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      transition: background var(--transition), color var(--transition);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    button { cursor: pointer; font-family: inherit; }
+    input, textarea, select {
+      font-family: inherit;
+      font-size: 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      width: 100%;
+      outline: none;
+      transition: border var(--transition), box-shadow var(--transition);
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+    }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+    h2 { font-size: 20px; font-weight: 700; margin-bottom: 16px; }
+    h3 { font-size: 16px; font-weight: 600; }
+
+    /* ============================================================
+       SCROLLBAR
+       ============================================================ */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ============================================================
+       LAYOUT
+       ============================================================ */
+    #app { display: flex; flex-direction: column; min-height: 100vh; }
+
+    /* ---- NAVBAR ---- */
+    .navbar {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 56px;
+      position: sticky; top: 0; z-index: 100;
+      transition: background var(--transition);
+    }
+    .navbar-brand {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 18px; font-weight: 800; color: var(--accent);
+      letter-spacing: -0.4px;
+    }
+    .navbar-brand svg { flex-shrink: 0; }
+    .navbar-right { display: flex; align-items: center; gap: 10px; }
+    .nav-tabs { display: flex; gap: 4px; }
+    .nav-tab {
+      background: none; border: none; color: var(--muted);
+      padding: 6px 14px; border-radius: var(--radius);
+      font-size: 13px; font-weight: 500; transition: all var(--transition);
+    }
+    .nav-tab:hover { background: var(--surface2); color: var(--text); }
+    .nav-tab.active { background: var(--accent-dim); color: var(--accent); font-weight: 700; }
+    .btn-icon {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); width: 36px; height: 36px;
+      border-radius: var(--radius); display: flex; align-items: center; justify-content: center;
+      transition: all var(--transition);
+    }
+    .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+    .user-chip {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 99px; padding: 4px 12px 4px 6px;
+      font-size: 13px; font-weight: 600;
+    }
+    .avatar {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: var(--accent); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800; flex-shrink: 0;
+    }
+
+    /* ---- MAIN CONTENT ---- */
+    .main { flex: 1; max-width: 1200px; width: 100%; margin: 0 auto; padding: 28px 24px; }
+
+    /* ============================================================
+       BUTTONS
+       ============================================================ */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 9px 18px; border-radius: var(--radius);
+      font-size: 13px; font-weight: 600; border: none;
+      transition: all var(--transition); white-space: nowrap;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { filter: brightness(1.15); }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-danger:hover { filter: brightness(1.15); }
+    .btn-ghost { background: none; color: var(--muted); border: none; padding: 6px 10px; font-size: 13px; }
+    .btn-ghost:hover { color: var(--accent); }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ============================================================
+       CARDS
+       ============================================================ */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      transition: background var(--transition), border var(--transition);
+    }
+    .card-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .card-body { padding: 20px; }
+
+    /* ============================================================
+       BOOK GRID & BOOK CARD
+       ============================================================ */
+    .books-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 18px;
+    }
+    .book-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      transition: transform .15s ease, box-shadow .15s ease, border-color var(--transition);
+      display: flex; flex-direction: column;
+    }
+    .book-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); border-color: var(--accent); }
+    .book-cover {
+      width: 100%; aspect-ratio: 2/3; display: flex; align-items: center; justify-content: center;
+      font-size: 40px; font-weight: 900; letter-spacing: -2px;
+      user-select: none; position: relative;
+    }
+    .book-cover-badge {
+      position: absolute; top: 8px; right: 8px;
+      font-size: 10px; font-weight: 700; padding: 2px 7px;
+      border-radius: 99px; background: var(--success); color: #fff;
+    }
+    .book-cover-badge.borrowed { background: var(--danger); }
+    .book-cover-badge.circulation { background: var(--warn); }
+    .book-info { padding: 12px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    .book-title { font-size: 13px; font-weight: 700; line-height: 1.35; }
+    .book-author { font-size: 12px; color: var(--muted); }
+    .book-genre { font-size: 11px; color: var(--accent); font-weight: 600; background: var(--accent-dim); display: inline-block; padding: 1px 8px; border-radius: 99px; margin-top: 2px; }
+    .book-stars { display: flex; align-items: center; gap: 2px; margin-top: 4px; }
+    .star-icon { color: var(--star); font-size: 12px; }
+    .star-icon.empty { color: var(--border); }
+    .book-rating-count { font-size: 11px; color: var(--muted); margin-left: 4px; }
+    .book-actions { padding: 10px 12px; border-top: 1px solid var(--border); display: flex; gap: 6px; flex-wrap: wrap; }
+
+    /* ============================================================
+       SECTIONS
+       ============================================================ */
+    .section-title {
+      font-size: 16px; font-weight: 700; margin-bottom: 16px;
+      display: flex; align-items: center; gap: 8px; color: var(--text);
+    }
+    .section-title::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+    .badge {
+      font-size: 11px; font-weight: 700; padding: 2px 8px;
+      border-radius: 99px; background: var(--accent); color: #fff; margin-left: 6px;
+    }
+
+    /* ============================================================
+       AUTH PAGE
+       ============================================================ */
+    .auth-wrap {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: var(--bg); padding: 24px;
+    }
+    .auth-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 36px 40px;
+      width: 100%; max-width: 420px; box-shadow: var(--shadow);
+    }
+    .auth-logo { display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 900; color: var(--accent); margin-bottom: 28px; }
+    .auth-tab-row { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+    .auth-tab {
+      flex: 1; background: none; border: none; padding: 10px; font-size: 14px;
+      font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent;
+      margin-bottom: -1px; transition: all var(--transition);
+    }
+    .auth-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .form-group { margin-bottom: 16px; }
+    .form-error { font-size: 12px; color: var(--danger); margin-top: 4px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    /* ============================================================
+       MODAL
+       ============================================================ */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 200;
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+      animation: fadeIn .15s ease;
+    }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); width: 100%; max-width: 520px;
+      max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow);
+      animation: slideUp .18s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(16px); opacity:0; } to { transform: translateY(0); opacity:1; } }
+    .modal-header { padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .modal-title { font-size: 16px; font-weight: 700; }
+    .modal-body { padding: 20px; }
+    .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+
+    /* ============================================================
+       RATING STARS INTERACTIVE
+       ============================================================ */
+    .rating-input { display: flex; gap: 4px; }
+    .rating-input span {
+      font-size: 24px; cursor: pointer; color: var(--border);
+      transition: color .1s ease; user-select: none;
+    }
+    .rating-input span.on { color: var(--star); }
+
+    /* ============================================================
+       HISTORY / ACTIVITY TABLE
+       ============================================================ */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead tr { background: var(--surface2); }
+    th { padding: 10px 14px; text-align: left; color: var(--muted); font-weight: 600; white-space: nowrap; }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    .status-pill {
+      display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 11px; font-weight: 700;
+    }
+    .pill-green { background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); }
+    .pill-red   { background: color-mix(in srgb, var(--danger)  15%, transparent); color: var(--danger); }
+    .pill-warn  { background: color-mix(in srgb, var(--warn)    15%, transparent); color: var(--warn); }
+    .pill-blue  { background: color-mix(in srgb, var(--accent)  15%, transparent); color: var(--accent); }
+
+    /* ============================================================
+       RECOMMENDATION CARD
+       ============================================================ */
+    .rec-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 16px 18px;
+      display: flex; gap: 16px; align-items: flex-start;
+      transition: border-color var(--transition);
+    }
+    .rec-card:hover { border-color: var(--accent); }
+    .rec-cover {
+      width: 54px; height: 78px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 900; flex-shrink: 0;
+    }
+    .rec-info { flex: 1; min-width: 0; }
+    .rec-reason { font-size: 11px; color: var(--accent); font-weight: 600; margin-top: 4px; }
+    .recs-grid { display: flex; flex-direction: column; gap: 12px; }
+
+    /* ============================================================
+       STATS ROW
+       ============================================================ */
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; margin-bottom: 28px; }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 18px 20px;
+    }
+    .stat-value { font-size: 28px; font-weight: 800; color: var(--accent); line-height: 1.1; }
+    .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+    /* ============================================================
+       SEARCH & FILTER BAR
+       ============================================================ */
+    .search-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .search-bar input { flex: 1; min-width: 180px; }
+    .search-bar select { width: auto; min-width: 130px; }
+
+    /* ============================================================
+       EMPTY STATE
+       ============================================================ */
+    .empty-state {
+      text-align: center; padding: 48px 24px; color: var(--muted);
+    }
+    .empty-state svg { opacity: .3; margin-bottom: 14px; }
+    .empty-state p { font-size: 15px; }
+
+    /* ============================================================
+       TOAST NOTIFICATIONS
+       ============================================================ */
+    #toast-container {
+      position: fixed; bottom: 24px; right: 24px; z-index: 999;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .toast {
+      background: var(--surface); border: 1px solid var(--border);
+      padding: 12px 18px; border-radius: var(--radius);
+      font-size: 13px; box-shadow: var(--shadow);
+      animation: slideIn .2s ease, fadeOut .3s ease 2.7s forwards;
+      max-width: 300px; display: flex; align-items: center; gap: 10px;
+    }
+    .toast-success { border-left: 3px solid var(--success); }
+    .toast-error   { border-left: 3px solid var(--danger); }
+    .toast-info    { border-left: 3px solid var(--accent); }
+    @keyframes slideIn { from { transform: translateX(20px); opacity:0; } to { transform: translateX(0); opacity:1; } }
+    @keyframes fadeOut { to { opacity:0; transform: translateX(10px); } }
+
+    /* ============================================================
+       PROGRESS BAR
+       ============================================================ */
+    .progress-bar { background: var(--surface2); border-radius: 99px; height: 6px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width .5s ease; }
+
+    /* ============================================================
+       RESPONSIVE
+       ============================================================ */
+    @media (max-width: 640px) {
+      .navbar { padding: 0 14px; }
+      .nav-tabs { display: none; }
+      .main { padding: 18px 14px; }
+      .auth-card { padding: 24px 18px; }
+      .form-row { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: 1fr 1fr; }
+    }
+
+    /* ============================================================
+       TABS (inside page)
+       ============================================================ */
+    .page-tabs { display: flex; gap: 4px; margin-bottom: 22px; flex-wrap: wrap; border-bottom: 1px solid var(--border); padding-bottom: 0; }
+    .page-tab {
+      background: none; border: none; padding: 9px 16px; font-size: 13px; font-weight: 600;
+      color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: all var(--transition);
+    }
+    .page-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .page-tab:hover { color: var(--text); }
+
+    /* ============================================================
+       DIVIDER
+       ============================================================ */
+    .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+    /* ============================================================
+       WISHLIST DELETE BUTTON
+       ============================================================ */
+    .wishlist-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+    }
+    .wishlist-item:last-child { border-bottom: none; }
+    .wishlist-meta { display: flex; align-items: center; gap: 12px; }
+  </style>
+</head>
+<body data-theme="dark">
+<div id="app">
+  <!-- AUTH SCREEN (shown before login) -->
+  <div id="auth-screen" class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <!-- Book icon SVG -->
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        Baca Keren
+      </div>
+      <div class="auth-tab-row">
+        <button class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Masuk</button>
+        <button class="auth-tab" id="tab-signup" onclick="switchAuthTab('signup')">Daftar</button>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <div id="form-login">
+        <div class="form-group">
+          <label>NIM / Email</label>
+          <input type="text" id="login-nim" placeholder="Contoh: 221234567" autocomplete="username" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="login-pw" placeholder="••••••••" autocomplete="current-password" />
+        </div>
+        <div id="login-error" class="form-error"></div>
+        <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="handleLogin()">Masuk</button>
+        <div style="text-align:center;margin-top:14px;font-size:12px;color:var(--muted)">
+          Belum punya akun? <a href="#" onclick="switchAuthTab('signup');return false;">Daftar sekarang</a>
+        </div>
+      </div>
+
+      <!-- SIGNUP FORM -->
+      <div id="form-signup" style="display:none">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nama Lengkap</label>
+            <input type="text" id="su-name" placeholder="Budi Santoso" />
+          </div>
+          <div class="form-group">
+            <label>NIM</label>
+            <input type="text" id="su-nim" placeholder="221234567" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Email Kampus</label>
+          <input type="email" id="su-email" placeholder="budi@mahasiswa.ac.id" />
+        </div>
+        <div class="form-group">
+          <label>Jurusan</label>
+          <select id="su-major">
+            <option value="">-- Pilih Jurusan --</option>
+            <option>Teknik Informatika</option>
+            <option>Sistem Informasi</option>
+            <option>Teknik Elektro</option>
+            <option>Manajemen</option>
+            <option>Akuntansi</option>
+            <option>Psikologi</option>
+            <option>Hukum</option>
+            <option>Kedokteran</option>
+            <option>Lainnya</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="su-pw" placeholder="Min. 6 karakter" />
+          </div>
+          <div class="form-group">
+            <label>Konfirmasi Password</label>
+            <input type="password" id="su-pw2" placeholder="Ulangi password" />
+          </div>
+        </div>
+        <div id="signup-error" class="form-error"></div>
+        <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="handleSignup()">Buat Akun</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APP (shown after login) -->
+  <div id="main-app" style="display:none">
+    <!-- NAVBAR -->
+    <nav class="navbar">
+      <div class="navbar-brand">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        Baca Keren
+      </div>
+      <div class="nav-tabs">
+        <button class="nav-tab active" onclick="showPage('home')">Beranda</button>
+        <button class="nav-tab" onclick="showPage('catalog')">Katalog</button>
+        <button class="nav-tab" onclick="showPage('wishlist')">Wishlist</button>
+        <button class="nav-tab" onclick="showPage('history')">Riwayat</button>
+        <button class="nav-tab" onclick="showPage('profile')">Profil</button>
+      </div>
+      <div class="navbar-right">
+        <button class="btn-icon" onclick="toggleTheme()" title="Toggle tema" aria-label="Toggle tema">
+          <svg id="theme-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
+        </button>
+        <div class="user-chip" id="user-chip">
+          <div class="avatar" id="nav-avatar">BK</div>
+          <span id="nav-username">Pengguna</span>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="handleLogout()">Keluar</button>
+      </div>
+    </nav>
+
+    <!-- PAGE CONTAINER -->
+    <main class="main">
+      <!-- HOME PAGE -->
+      <div id="page-home" class="page">
+        <div class="stats-row" id="stats-row"></div>
+        <div class="section-title">🎯 Rekomendasi Untukmu</div>
+        <div id="recs-container" class="recs-grid" style="margin-bottom:32px"></div>
+        <div class="section-title">📚 Baru Ditambahkan</div>
+        <div id="new-books-grid" class="books-grid"></div>
+      </div>
+
+      <!-- CATALOG PAGE -->
+      <div id="page-catalog" class="page" style="display:none">
+        <h2>Katalog Buku</h2>
+        <div class="search-bar">
+          <input type="text" id="catalog-search" placeholder="Cari judul, penulis…" oninput="filterCatalog()" />
+          <select id="catalog-genre" onchange="filterCatalog()">
+            <option value="">Semua Genre</option>
+          </select>
+          <select id="catalog-avail" onchange="filterCatalog()">
+            <option value="">Semua Status</option>
+            <option value="available">Tersedia</option>
+            <option value="borrowed">Dipinjam</option>
+            <option value="circulation">Sirkulasi</option>
+          </select>
+        </div>
+        <div id="catalog-grid" class="books-grid"></div>
+        <div id="catalog-empty" class="empty-state" style="display:none">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <p>Tidak ada buku yang ditemukan.</p>
+        </div>
+      </div>
+
+      <!-- WISHLIST PAGE -->
+      <div id="page-wishlist" class="page" style="display:none">
+        <h2>Wishlist Saya</h2>
+        <div id="wishlist-container"></div>
+      </div>
+
+      <!-- HISTORY PAGE -->
+      <div id="page-history" class="page" style="display:none">
+        <h2>Riwayat Aktivitas</h2>
+        <div class="page-tabs">
+          <button class="page-tab active" onclick="switchHistoryTab('borrow')">Peminjaman</button>
+          <button class="page-tab" onclick="switchHistoryTab('rating')">Rating Diberikan</button>
+          <button class="page-tab" onclick="switchHistoryTab('activity')">Aktivitas</button>
+        </div>
+        <div id="history-borrow"></div>
+        <div id="history-rating" style="display:none"></div>
+        <div id="history-activity" style="display:none"></div>
+      </div>
+
+      <!-- PROFILE PAGE -->
+      <div id="page-profile" class="page" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:760px">
+          <div class="card">
+            <div class="card-header"><h3>Informasi Akun</h3></div>
+            <div class="card-body">
+              <div class="form-group"><label>Nama Lengkap</label><input type="text" id="p-name" /></div>
+              <div class="form-group"><label>NIM</label><input type="text" id="p-nim" readonly style="opacity:.6" /></div>
+              <div class="form-group"><label>Email</label><input type="email" id="p-email" /></div>
+              <div class="form-group"><label>Jurusan</label><input type="text" id="p-major" readonly style="opacity:.6" /></div>
+              <button class="btn btn-primary btn-sm" onclick="saveProfile()">Simpan Perubahan</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>Statistik Membaca</h3></div>
+            <div class="card-body" id="profile-stats"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- MODAL: Book Detail -->
+<div id="modal-book" class="modal-overlay" style="display:none" onclick="closeModalOnOverlay(event,'modal-book')">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-book-title">Detail Buku</span>
+      <button class="btn-icon" onclick="closeModal('modal-book')" style="width:30px;height:30px">✕</button>
+    </div>
+    <div class="modal-body" id="modal-book-body"></div>
+    <div class="modal-footer" id="modal-book-footer"></div>
+  </div>
+</div>
+
+<!-- MODAL: Borrow Confirm -->
+<div id="modal-borrow" class="modal-overlay" style="display:none" onclick="closeModalOnOverlay(event,'modal-borrow')">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Konfirmasi Peminjaman</span>
+      <button class="btn-icon" onclick="closeModal('modal-borrow')" style="width:30px;height:30px">✕</button>
+    </div>
+    <div class="modal-body" id="modal-borrow-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-borrow')">Batal</button>
+      <button class="btn btn-primary" onclick="confirmBorrow()">Pinjam Sekarang</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Rate Book -->
+<div id="modal-rate" class="modal-overlay" style="display:none" onclick="closeModalOnOverlay(event,'modal-rate')">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Beri Rating Buku</span>
+      <button class="btn-icon" onclick="closeModal('modal-rate')" style="width:30px;height:30px">✕</button>
+    </div>
+    <div class="modal-body" id="modal-rate-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-rate')">Batal</button>
+      <button class="btn btn-primary" onclick="submitRating()">Simpan Rating</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div id="toast-container"></div>
+
+<!-- ================================================================
+     JAVASCRIPT — No external libraries
+     ================================================================ -->
+<script>
+/**
+ * ================================================================
+ * BACA KEREN — Sistem Rekomendasi Buku Perpustakaan
+ * ================================================================
+ * Arsitektur:
+ *  - STATE     : objek pusat yang menyimpan semua data runtime
+ *  - DB        : simulasi database (localStorage-backed)
+ *  - AUTH      : manajemen akun & sesi
+ *  - CATALOG   : manajemen dan tampilan buku
+ *  - BORROW    : sistem peminjaman
+ *  - WISHLIST  : daftar buku yang ingin dibaca
+ *  - RATING    : sistem rating bintang
+ *  - RECOMMEND : engine rekomendasi berbasis riwayat & aktivitas
+ *  - UI        : render halaman, navigasi, toast, modal
+ * ================================================================
+ */
+
+/* ----------------------------------------------------------------
+   STATE — data runtime yang aktif
+   ---------------------------------------------------------------- */
+const STATE = {
+  currentUser: null,   // objek user yang sedang login
+  pendingBorrow: null, // id buku yang sedang dalam proses pinjam
+  pendingRate: null,   // id buku yang akan di-rating
+  pendingRateVal: 0,   // nilai bintang sementara
+  currentPage: 'home', // halaman aktif
+  historyTab: 'borrow' // sub-tab pada halaman riwayat
+};
+
+/* ----------------------------------------------------------------
+   DB — helper baca/tulis localStorage
+   ---------------------------------------------------------------- */
+const DB = {
+  /** Ambil semua akun terdaftar */
+  getAccounts() {
+    return JSON.parse(localStorage.getItem('bk_accounts') || '[]');
+  },
+  /** Simpan semua akun */
+  saveAccounts(list) {
+    localStorage.setItem('bk_accounts', JSON.stringify(list));
+  },
+  /** Tambah akun baru */
+  addAccount(user) {
+    const list = this.getAccounts();
+    list.push(user);
+    this.saveAccounts(list);
+  },
+  /** Cari akun berdasarkan NIM atau email */
+  findAccount(nim) {
+    return this.getAccounts().find(u => u.nim === nim || u.email === nim);
+  },
+  /** Ambil data user yang sedang login dari localStorage */
+  getSession() {
+    const raw = localStorage.getItem('bk_session');
+    return raw ? JSON.parse(raw) : null;
+  },
+  /** Simpan sesi login */
+  saveSession(user) {
+    localStorage.setItem('bk_session', JSON.stringify(user));
+  },
+  /** Hapus sesi (logout) */
+  clearSession() {
+    localStorage.removeItem('bk_session');
+  },
+  /** Ambil data katalog buku */
+  getBooks() {
+    return JSON.parse(localStorage.getItem('bk_books') || 'null') || SEED_BOOKS;
+  },
+  /** Simpan data katalog buku */
+  saveBooks(list) {
+    localStorage.setItem('bk_books', JSON.stringify(list));
+  },
+  /** Ambil wishlist user yang sedang login */
+  getWishlist() {
+    const key = `bk_wish_${STATE.currentUser.nim}`;
+    return JSON.parse(localStorage.getItem(key) || '[]');
+  },
+  /** Simpan wishlist */
+  saveWishlist(list) {
+    const key = `bk_wish_${STATE.currentUser.nim}`;
+    localStorage.setItem(key, JSON.stringify(list));
+  },
+  /** Ambil riwayat peminjaman user aktif */
+  getBorrowHistory() {
+    const key = `bk_borrow_${STATE.currentUser.nim}`;
+    return JSON.parse(localStorage.getItem(key) || '[]');
+  },
+  /** Tambah entri riwayat peminjaman */
+  addBorrowRecord(record) {
+    const key = `bk_borrow_${STATE.currentUser.nim}`;
+    const list = this.getBorrowHistory();
+    list.unshift(record);
+    localStorage.setItem(key, JSON.stringify(list));
+  },
+  /** Ambil riwayat rating dari user aktif */
+  getRatings() {
+    const key = `bk_ratings_${STATE.currentUser.nim}`;
+    return JSON.parse(localStorage.getItem(key) || '{}');
+  },
+  /** Simpan semua rating user */
+  saveRatings(obj) {
+    const key = `bk_ratings_${STATE.currentUser.nim}`;
+    localStorage.setItem(key, JSON.stringify(obj));
+  },
+  /** Ambil global rating (agregat semua user) */
+  getGlobalRatings() {
+    return JSON.parse(localStorage.getItem('bk_global_ratings') || '{}');
+  },
+  /** Simpan global rating */
+  saveGlobalRatings(obj) {
+    localStorage.setItem('bk_global_ratings', JSON.stringify(obj));
+  },
+  /** Ambil log aktivitas user aktif */
+  getActivityLog() {
+    const key = `bk_activity_${STATE.currentUser.nim}`;
+    return JSON.parse(localStorage.getItem(key) || '[]');
+  },
+  /** Catat aktivitas (view, borrow, rate, wishlist) */
+  logActivity(type, bookId, detail) {
+    const key = `bk_activity_${STATE.currentUser.nim}`;
+    const log = this.getActivityLog();
+    log.unshift({ type, bookId, detail, ts: Date.now() });
+    if (log.length > 200) log.length = 200; // batasi 200 entri
+    localStorage.setItem(key, JSON.stringify(log));
+  }
+};
+
+/* ----------------------------------------------------------------
+   SEED DATA — data awal buku perpustakaan
+   ---------------------------------------------------------------- */
+const SEED_BOOKS = [
+  { id: 1,  title: 'Pemrograman Python Modern',      author: 'Arif Wicaksono',    genre: 'Teknologi',    year: 2022, status: 'available',   cover: '#4f8ef7', emoji: '🐍', desc: 'Panduan lengkap Python dari dasar hingga machine learning.' },
+  { id: 2,  title: 'Struktur Data & Algoritma',      author: 'Dewi Kartika',      genre: 'Teknologi',    year: 2021, status: 'borrowed',    cover: '#7c5cd8', emoji: '⚙️', desc: 'Konsep dasar struktur data dan analisis algoritma.' },
+  { id: 3,  title: 'Kalkulus Lanjutan',              author: 'Prof. Bambang R.',  genre: 'Matematika',   year: 2020, status: 'available',   cover: '#2ab8a4', emoji: '∫',  desc: 'Kalkulus multivariabel dan persamaan diferensial.' },
+  { id: 4,  title: 'Basis Data Relasional',          author: 'Sari Indah M.',     genre: 'Teknologi',    year: 2023, status: 'circulation', cover: '#f0a04b', emoji: '🗄️', desc: 'Desain database, SQL tingkat lanjut, dan normalisasi.' },
+  { id: 5,  title: 'Jaringan Komputer Dasar',        author: 'Hendra Wijaya',     genre: 'Teknologi',    year: 2021, status: 'available',   cover: '#e05c6a', emoji: '🌐', desc: 'Protokol TCP/IP, arsitektur jaringan, dan keamanan.' },
+  { id: 6,  title: 'Manajemen Keuangan Perusahaan',  author: 'Rina Amalia',       genre: 'Bisnis',       year: 2022, status: 'available',   cover: '#4caf8c', emoji: '💰', desc: 'Analisis laporan keuangan dan keputusan investasi.' },
+  { id: 7,  title: 'Psikologi Kognitif',             author: 'Dr. Maya Sari',     genre: 'Psikologi',    year: 2021, status: 'borrowed',    cover: '#f06060', emoji: '🧠', desc: 'Persepsi, memori, berpikir, dan bahasa.' },
+  { id: 8,  title: 'Hukum Perdata Indonesia',        author: 'Prof. Ahmad Z.',    genre: 'Hukum',        year: 2020, status: 'available',   cover: '#6c7ef7', emoji: '⚖️', desc: 'Sistem hukum perdata dan perkembangan yurisprudensi.' },
+  { id: 9,  title: 'Machine Learning Terapan',       author: 'Budi Prasetyo',     genre: 'Teknologi',    year: 2023, status: 'available',   cover: '#a05cf0', emoji: '🤖', desc: 'Algoritma ML, deep learning, dan implementasi praktis.' },
+  { id: 10, title: 'Statistika untuk Penelitian',    author: 'Lestari Wulan',     genre: 'Matematika',   year: 2022, status: 'circulation', cover: '#f05cb0', emoji: '📊', desc: 'Metode statistika deskriptif dan inferensial.' },
+  { id: 11, title: 'Akuntansi Biaya',               author: 'Citra Dewi',        genre: 'Akuntansi',    year: 2021, status: 'available',   cover: '#4b9ef0', emoji: '📒', desc: 'Perhitungan harga pokok produk dan analisis biaya.' },
+  { id: 12, title: 'Anatomi & Fisiologi Manusia',   author: 'Dr. Rizki Arman',   genre: 'Kedokteran',   year: 2022, status: 'borrowed',    cover: '#f06a4b', emoji: '🫀', desc: 'Struktur dan fungsi organ manusia secara komprehensif.' },
+  { id: 13, title: 'Kecerdasan Buatan',             author: 'Fauzan Hidayat',    genre: 'Teknologi',    year: 2023, status: 'available',   cover: '#4cf0a8', emoji: '🧬', desc: 'Dasar AI, pencarian heuristik, dan logika fuzzy.' },
+  { id: 14, title: 'Pemasaran Digital',             author: 'Anita Pertiwi',     genre: 'Bisnis',       year: 2022, status: 'available',   cover: '#f0c04b', emoji: '📱', desc: 'SEO, media sosial, dan strategi konten digital.' },
+  { id: 15, title: 'Pemrograman Web Full-Stack',    author: 'Kevin Setiawan',    genre: 'Teknologi',    year: 2023, status: 'available',   cover: '#5cf0e0', emoji: '🌍', desc: 'HTML, CSS, JavaScript, Node.js, dan React dari dasar.' },
+  { id: 16, title: 'Sosiologi Pendidikan',          author: 'Dra. Nurul Huda',   genre: 'Sosial',       year: 2020, status: 'available',   cover: '#b04cf0', emoji: '🏫', desc: 'Hubungan institusi sosial dengan proses pendidikan.' },
+  { id: 17, title: 'Fisika Modern',                author: 'Dr. Surya Dinata',  genre: 'Sains',        year: 2021, status: 'circulation', cover: '#f0504b', emoji: '⚛️', desc: 'Relativitas, mekanika kuantum, dan fisika partikel.' },
+  { id: 18, title: 'Kimia Organik Dasar',          author: 'Putri Rahmania',    genre: 'Sains',        year: 2022, status: 'available',   cover: '#4bf0c0', emoji: '🧪', desc: 'Senyawa karbon, reaksi organik, dan spektroskopi.' },
+  { id: 19, title: 'Entrepreneurship & Startup',   author: 'Reza Mahendra',     genre: 'Bisnis',       year: 2023, status: 'available',   cover: '#f04bc0', emoji: '🚀', desc: 'Membangun startup dari ide hingga product-market fit.' },
+  { id: 20, title: 'Keamanan Siber',               author: 'Dimas Pratama',     genre: 'Teknologi',    year: 2023, status: 'available',   cover: '#4b70f0', emoji: '🔐', desc: 'Ethical hacking, kriptografi, dan forensik digital.' },
+];
+
+/* ----------------------------------------------------------------
+   AUTH — sistem akun
+   ---------------------------------------------------------------- */
+
+/** Ganti antara tab login dan signup */
+function switchAuthTab(tab) {
+  document.getElementById('form-login').style.display   = tab === 'login'  ? '' : 'none';
+  document.getElementById('form-signup').style.display  = tab === 'signup' ? '' : 'none';
+  document.getElementById('tab-login').classList.toggle('active',  tab === 'login');
+  document.getElementById('tab-signup').classList.toggle('active', tab === 'signup');
+  document.getElementById('login-error').textContent  = '';
+  document.getElementById('signup-error').textContent = '';
+}
+
+/** Proses login — validasi dan set sesi */
+function handleLogin() {
+  const nim = document.getElementById('login-nim').value.trim();
+  const pw  = document.getElementById('login-pw').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+
+  if (!nim || !pw) { errEl.textContent = 'NIM/Email dan password wajib diisi.'; return; }
+
+  const user = DB.findAccount(nim);
+  if (!user) { errEl.textContent = 'Akun tidak ditemukan.'; return; }
+  if (user.password !== btoa(pw)) { errEl.textContent = 'Password salah.'; return; }
+
+  DB.saveSession(user);
+  STATE.currentUser = user;
+  bootApp();
+}
+
+/** Proses signup — validasi dan buat akun baru */
+function handleSignup() {
+  const name  = document.getElementById('su-name').value.trim();
+  const nim   = document.getElementById('su-nim').value.trim();
+  const email = document.getElementById('su-email').value.trim();
+  const major = document.getElementById('su-major').value;
+  const pw    = document.getElementById('su-pw').value;
+  const pw2   = document.getElementById('su-pw2').value;
+  const errEl = document.getElementById('signup-error');
+  errEl.textContent = '';
+
+  // Validasi input
+  if (!name || !nim || !email || !major || !pw) {
+    errEl.textContent = 'Semua field wajib diisi.'; return;
+  }
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    errEl.textContent = 'Format email tidak valid.'; return;
+  }
+  if (pw.length < 6) {
+    errEl.textContent = 'Password minimal 6 karakter.'; return;
+  }
+  if (pw !== pw2) {
+    errEl.textContent = 'Konfirmasi password tidak cocok.'; return;
+  }
+  if (DB.findAccount(nim)) {
+    errEl.textContent = 'NIM sudah terdaftar.'; return;
+  }
+
+  const newUser = { name, nim, email, major, password: btoa(pw), createdAt: Date.now() };
+  DB.addAccount(newUser);
+  DB.saveSession(newUser);
+  STATE.currentUser = newUser;
+  bootApp();
+  showToast(`Selamat datang, ${name}! 🎉`, 'success');
+}
+
+/** Logout — bersihkan sesi dan tampilkan auth */
+function handleLogout() {
+  DB.clearSession();
+  STATE.currentUser = null;
+  document.getElementById('auth-screen').style.display = '';
+  document.getElementById('main-app').style.display    = 'none';
+  // Reset form login
+  document.getElementById('login-nim').value = '';
+  document.getElementById('login-pw').value  = '';
+}
+
+/* ----------------------------------------------------------------
+   BOOT — inisialisasi aplikasi setelah login
+   ---------------------------------------------------------------- */
+function bootApp() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('main-app').style.display    = '';
+
+  // Inisialisasi buku seed jika belum ada
+  if (!localStorage.getItem('bk_books')) {
+    DB.saveBooks(SEED_BOOKS);
+  }
+
+  // Perbarui UI navbar
+  const u = STATE.currentUser;
+  document.getElementById('nav-username').textContent = u.name.split(' ')[0];
+  document.getElementById('nav-avatar').textContent   = u.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+
+  showPage('home');
+}
+
+/* ----------------------------------------------------------------
+   UI — navigasi halaman
+   ---------------------------------------------------------------- */
+
+/** Tampilkan halaman tertentu dan sembunyikan yang lain */
+function showPage(page) {
+  STATE.currentPage = page;
+  const pages = ['home','catalog','wishlist','history','profile'];
+  pages.forEach(p => {
+    const el = document.getElementById(`page-${p}`);
+    if (el) el.style.display = p === page ? '' : 'none';
+  });
+
+  // Perbarui nav-tab aktif
+  document.querySelectorAll('.nav-tab').forEach((btn, i) => {
+    btn.classList.toggle('active', pages[i] === page);
+  });
+
+  // Render konten halaman
+  if (page === 'home')     renderHome();
+  if (page === 'catalog')  renderCatalog();
+  if (page === 'wishlist') renderWishlist();
+  if (page === 'history')  renderHistory();
+  if (page === 'profile')  renderProfile();
+}
+
+/* ----------------------------------------------------------------
+   HOME PAGE — statistik, rekomendasi, buku baru
+   ---------------------------------------------------------------- */
+
+function renderHome() {
+  renderStats();
+  renderRecommendations();
+  renderNewBooks();
+}
+
+/** Render kartu statistik pengguna */
+function renderStats() {
+  const history  = DB.getBorrowHistory();
+  const wishlist = DB.getWishlist();
+  const ratings  = DB.getRatings();
+  const books    = DB.getBooks();
+
+  const stats = [
+    { value: history.length, label: 'Total Dipinjam' },
+    { value: wishlist.length, label: 'Wishlist' },
+    { value: Object.keys(ratings).length, label: 'Buku Dirating' },
+    { value: books.filter(b => b.status === 'available').length, label: 'Buku Tersedia' },
+  ];
+
+  document.getElementById('stats-row').innerHTML = stats.map(s => `
+    <div class="stat-card">
+      <div class="stat-value">${s.value}</div>
+      <div class="stat-label">${s.label}</div>
+    </div>
+  `).join('');
+}
+
+/** Render bagian buku terbaru (5 terakhir dari seed) */
+function renderNewBooks() {
+  const books = DB.getBooks().slice(-5).reverse();
+  document.getElementById('new-books-grid').innerHTML = books.map(b => buildBookCard(b)).join('');
+}
+
+/* ----------------------------------------------------------------
+   RECOMMENDATION ENGINE
+   ---------------------------------------------------------------- */
+
+/**
+ * Algoritma rekomendasi sederhana berbasis:
+ * 1. Genre favorit (dari riwayat pinjam & wishlist)
+ * 2. Buku yang belum pernah dipinjam / ada di wishlist
+ * 3. Rating tertinggi secara global
+ * 4. Aktivitas browse (buku yang sering dilihat)
+ *
+ * Skor dihitung sebagai:
+ *   score = genreMatch*3 + activityMatch*2 + globalRating*1
+ */
+function getRecommendations() {
+  const books      = DB.getBooks();
+  const history    = DB.getBorrowHistory();
+  const wishlist   = DB.getWishlist();
+  const activity   = DB.getActivityLog();
+  const globalRat  = DB.getGlobalRatings();
+
+  // Kumpulkan genre yang sudah dipinjam / di-wishlist
+  const borrowedIds   = new Set(history.map(h => h.bookId));
+  const wishlistIds   = new Set(wishlist);
+  const borrowedBooks = books.filter(b => borrowedIds.has(b.id));
+  const wishBooks     = books.filter(b => wishlistIds.has(b.id));
+
+  // Hitung frekuensi genre favorit
+  const genreFreq = {};
+  [...borrowedBooks, ...wishBooks].forEach(b => {
+    genreFreq[b.genre] = (genreFreq[b.genre] || 0) + 1;
+  });
+
+  // Hitung frekuensi buku yang sering dilihat
+  const viewFreq = {};
+  activity.filter(a => a.type === 'view').forEach(a => {
+    viewFreq[a.bookId] = (viewFreq[a.bookId] || 0) + 1;
+  });
+
+  // Buku yang belum dipinjam dan bukan sedang dalam wishlist penuh
+  const candidates = books.filter(b => !borrowedIds.has(b.id));
+
+  // Hitung skor tiap buku kandidat
+  const scored = candidates.map(b => {
+    const genreScore    = (genreFreq[b.genre] || 0) * 3;
+    const actScore      = (viewFreq[b.id] || 0) * 2;
+    const globalAvg     = globalRat[b.id]
+      ? globalRat[b.id].sum / globalRat[b.id].count
+      : 0;
+    const ratingScore   = globalAvg;
+
+    // Tentukan alasan rekomendasi
+    let reason = 'Populer di perpustakaan';
+    if (genreFreq[b.genre] > 0) reason = `Karena kamu suka genre "${b.genre}"`;
+    else if (viewFreq[b.id] > 0) reason = 'Sering kamu lihat sebelumnya';
+    else if (globalAvg >= 4)     reason = 'Rating sangat tinggi dari pembaca lain';
+
+    return { ...b, score: genreScore + actScore + ratingScore, reason };
+  });
+
+  // Urutkan berdasarkan skor tertinggi, ambil top-6
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, 6);
+}
+
+/** Render kartu rekomendasi di halaman beranda */
+function renderRecommendations() {
+  const recs = getRecommendations();
+  const container = document.getElementById('recs-container');
+
+  if (recs.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <p>Pinjam beberapa buku dulu untuk mendapatkan rekomendasi personal!</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = recs.map(b => {
+    const globalRat = DB.getGlobalRatings();
+    const gr = globalRat[b.id];
+    const avg = gr ? (gr.sum / gr.count).toFixed(1) : '–';
+    return `
+      <div class="rec-card">
+        <div class="rec-cover" style="background:${b.cover}20;color:${b.cover}">
+          ${b.emoji}
+        </div>
+        <div class="rec-info">
+          <div style="font-weight:700;font-size:14px">${escHtml(b.title)}</div>
+          <div style="font-size:12px;color:var(--muted)">${escHtml(b.author)} · ${b.year}</div>
+          <div class="rec-reason">${escHtml(b.reason)}</div>
+          <div style="margin-top:6px;display:flex;gap:8px;align-items:center">
+            ${buildStatusPill(b.status)}
+            ${avg !== '–' ? `<span style="font-size:12px;color:var(--star)">★ ${avg}</span>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;align-self:center">
+          <button class="btn btn-primary btn-sm" onclick="openBookDetail(${b.id})">Detail</button>
+          ${b.status === 'available'
+            ? `<button class="btn btn-secondary btn-sm" onclick="openBorrowModal(${b.id})">Pinjam</button>`
+            : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* ----------------------------------------------------------------
+   CATALOG PAGE
+   ---------------------------------------------------------------- */
+
+/** Render katalog buku lengkap */
+function renderCatalog() {
+  // Isi dropdown genre
+  const books  = DB.getBooks();
+  const genres = [...new Set(books.map(b => b.genre))].sort();
+  const sel = document.getElementById('catalog-genre');
+  // Jaga opsi "Semua Genre" tetap ada
+  sel.innerHTML = `<option value="">Semua Genre</option>` +
+    genres.map(g => `<option value="${escHtml(g)}">${escHtml(g)}</option>`).join('');
+
+  filterCatalog();
+}
+
+/** Filter dan tampilkan buku sesuai pencarian / genre / status */
+function filterCatalog() {
+  const query  = (document.getElementById('catalog-search')?.value || '').toLowerCase();
+  const genre  = document.getElementById('catalog-genre')?.value || '';
+  const avail  = document.getElementById('catalog-avail')?.value || '';
+  const books  = DB.getBooks();
+
+  const filtered = books.filter(b => {
+    const matchQ = !query || b.title.toLowerCase().includes(query) || b.author.toLowerCase().includes(query);
+    const matchG = !genre || b.genre === genre;
+    const matchA = !avail || b.status === avail;
+    return matchQ && matchG && matchA;
+  });
+
+  const grid  = document.getElementById('catalog-grid');
+  const empty = document.getElementById('catalog-empty');
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '';
+    empty.style.display = '';
+  } else {
+    empty.style.display = 'none';
+    grid.innerHTML = filtered.map(b => buildBookCard(b)).join('');
+  }
+}
+
+/* ----------------------------------------------------------------
+   BOOK CARD BUILDER
+   ---------------------------------------------------------------- */
+
+/** Bangun HTML kartu buku */
+function buildBookCard(b) {
+  const globalRat = DB.getGlobalRatings();
+  const gr  = globalRat[b.id];
+  const avg = gr ? gr.sum / gr.count : 0;
+  const wishlist = DB.getWishlist();
+  const inWish   = wishlist.includes(b.id);
+
+  return `
+    <div class="book-card">
+      <div class="book-cover" style="background:${b.cover}22;color:${b.cover}" onclick="openBookDetail(${b.id});DB.logActivity('view',${b.id},'${escHtml(b.title)}')" style="cursor:pointer">
+        <span style="font-size:44px">${b.emoji}</span>
+        ${buildStatusBadge(b.status)}
+      </div>
+      <div class="book-info">
+        <div class="book-title">${escHtml(b.title)}</div>
+        <div class="book-author">${escHtml(b.author)}</div>
+        <span class="book-genre">${escHtml(b.genre)}</span>
+        <div class="book-stars">
+          ${buildStars(avg)}
+          <span class="book-rating-count">${gr ? `(${gr.count})` : '(0)'}</span>
+        </div>
+      </div>
+      <div class="book-actions">
+        <button class="btn btn-secondary btn-sm" onclick="openBookDetail(${b.id})">Detail</button>
+        ${b.status === 'available'
+          ? `<button class="btn btn-primary btn-sm" onclick="openBorrowModal(${b.id})">Pinjam</button>`
+          : ''}
+        <button class="btn btn-ghost btn-sm" onclick="toggleWishlist(${b.id})" title="${inWish ? 'Hapus dari wishlist' : 'Tambah ke wishlist'}" style="color:${inWish ? 'var(--warn)' : 'var(--muted)'}">
+          ${inWish ? '♥' : '♡'}
+        </button>
+      </div>
+    </div>`;
+}
+
+/** Bangun HTML bintang (1–5) */
+function buildStars(avg) {
+  return [1,2,3,4,5].map(i =>
+    `<span class="star-icon ${i <= Math.round(avg) ? '' : 'empty'}">★</span>`
+  ).join('');
+}
+
+/** Bangun badge ketersediaan di cover buku */
+function buildStatusBadge(status) {
+  const map = {
+    available:   ['', ''],
+    borrowed:    ['borrowed', 'Dipinjam'],
+    circulation: ['circulation', 'Sirkulasi'],
+  };
+  const [cls, label] = map[status] || ['',''];
+  if (!label) return '';
+  return `<span class="book-cover-badge ${cls}">${label}</span>`;
+}
+
+/** Bangun pill status ketersediaan */
+function buildStatusPill(status) {
+  const map = {
+    available:   ['pill-green', 'Tersedia'],
+    borrowed:    ['pill-red',   'Dipinjam'],
+    circulation: ['pill-warn',  'Sirkulasi'],
+  };
+  const [cls, label] = map[status] || ['', status];
+  return `<span class="status-pill ${cls}">${label}</span>`;
+}
+
+/* ----------------------------------------------------------------
+   BOOK DETAIL MODAL
+   ---------------------------------------------------------------- */
+
+/** Tampilkan modal detail buku */
+function openBookDetail(id) {
+  const book = DB.getBooks().find(b => b.id === id);
+  if (!book) return;
+
+  // Catat aktivitas melihat buku
+  DB.logActivity('view', id, book.title);
+
+  const globalRat = DB.getGlobalRatings();
+  const gr  = globalRat[id];
+  const avg = gr ? (gr.sum / gr.count).toFixed(1) : '–';
+  const userRat = DB.getRatings()[id] || 0;
+  const wishlist = DB.getWishlist();
+  const inWish   = wishlist.includes(id);
+
+  document.getElementById('modal-book-title').textContent = book.title;
+  document.getElementById('modal-book-body').innerHTML = `
+    <div style="display:flex;gap:18px;align-items:flex-start;margin-bottom:16px">
+      <div style="width:80px;height:116px;border-radius:8px;background:${book.cover}22;color:${book.cover};display:flex;align-items:center;justify-content:center;font-size:42px;flex-shrink:0">${book.emoji}</div>
+      <div style="flex:1">
+        <div style="font-size:18px;font-weight:800;margin-bottom:4px">${escHtml(book.title)}</div>
+        <div style="color:var(--muted);margin-bottom:4px">${escHtml(book.author)} · ${book.year}</div>
+        <span class="book-genre">${escHtml(book.genre)}</span>
+        <div style="margin-top:8px">${buildStatusPill(book.status)}</div>
+      </div>
+    </div>
+    <p style="color:var(--muted);font-size:13px;line-height:1.7;margin-bottom:16px">${escHtml(book.desc)}</p>
+    <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--surface2);border-radius:var(--radius)">
+      <div style="text-align:center">
+        <div style="font-size:24px;font-weight:800;color:var(--star)">${avg}</div>
+        <div style="font-size:11px;color:var(--muted)">${gr ? gr.count : 0} rating</div>
+      </div>
+      <div style="flex:1">
+        <div style="display:flex;gap:4px;margin-bottom:4px">${buildStars(gr ? gr.sum/gr.count : 0)}</div>
+        <div style="font-size:12px;color:var(--muted)">Rating kamu: ${userRat > 0 ? '★'.repeat(userRat) + ' (' + userRat + '/5)' : 'Belum dirating'}</div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('modal-book-footer').innerHTML = `
+    <button class="btn btn-ghost" onclick="toggleWishlist(${id});closeModal('modal-book')" style="color:${inWish ? 'var(--warn)' : ''}">
+      ${inWish ? '♥ Hapus Wishlist' : '♡ Tambah Wishlist'}
+    </button>
+    <button class="btn btn-secondary" onclick="openRateModal(${id})">⭐ Rating</button>
+    ${book.status === 'available'
+      ? `<button class="btn btn-primary" onclick="closeModal('modal-book');openBorrowModal(${id})">📚 Pinjam</button>`
+      : `<button class="btn btn-primary" disabled>Tidak Tersedia</button>`}
+  `;
+
+  showModal('modal-book');
+}
+
+/* ----------------------------------------------------------------
+   BORROW SYSTEM — sistem peminjaman
+   ---------------------------------------------------------------- */
+
+/** Buka modal konfirmasi peminjaman */
+function openBorrowModal(id) {
+  const book = DB.getBooks().find(b => b.id === id);
+  if (!book || book.status !== 'available') {
+    showToast('Buku tidak tersedia untuk dipinjam.', 'error');
+    return;
+  }
+  STATE.pendingBorrow = id;
+
+  const dueDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+  document.getElementById('modal-borrow-body').innerHTML = `
+    <div style="display:flex;gap:14px;align-items:center;margin-bottom:16px">
+      <div style="width:56px;height:80px;border-radius:6px;background:${book.cover}22;color:${book.cover};display:flex;align-items:center;justify-content:center;font-size:28px">${book.emoji}</div>
+      <div>
+        <div style="font-weight:700">${escHtml(book.title)}</div>
+        <div style="font-size:13px;color:var(--muted)">${escHtml(book.author)}</div>
+      </div>
+    </div>
+    <div style="background:var(--surface2);padding:14px;border-radius:var(--radius);font-size:13px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <span style="color:var(--muted)">Tanggal pinjam</span>
+        <strong>${formatDate(Date.now())}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--muted)">Tenggat kembali</span>
+        <strong style="color:var(--warn)">${formatDate(dueDate.getTime())}</strong>
+      </div>
+    </div>
+    <p style="margin-top:12px;font-size:12px;color:var(--muted)">Keterlambatan pengembalian akan dikenai denda administratif.</p>
+  `;
+  showModal('modal-borrow');
+}
+
+/** Proses peminjaman buku setelah konfirmasi */
+function confirmBorrow() {
+  const id   = STATE.pendingBorrow;
+  const books = DB.getBooks();
+  const book = books.find(b => b.id === id);
+  if (!book) return;
+
+  // Update status buku menjadi dipinjam
+  book.status = 'borrowed';
+  DB.saveBooks(books);
+
+  // Tambah ke riwayat peminjaman
+  const record = {
+    bookId:    id,
+    title:     book.title,
+    author:    book.author,
+    genre:     book.genre,
+    borrowedAt: Date.now(),
+    dueDate:   Date.now() + 14 * 24 * 60 * 60 * 1000,
+    returnedAt: null
+  };
+  DB.addBorrowRecord(record);
+
+  // Catat aktivitas pinjam
+  DB.logActivity('borrow', id, book.title);
+
+  closeModal('modal-borrow');
+  showToast(`"${book.title}" berhasil dipinjam! 📚`, 'success');
+
+  // Refresh halaman jika masih di halaman terkait
+  if (STATE.currentPage === 'home')    renderHome();
+  if (STATE.currentPage === 'catalog') filterCatalog();
+  if (STATE.currentPage === 'history') renderHistory();
+}
+
+/** Kembalikan buku (panggil dari riwayat) */
+function returnBook(borrowIdx) {
+  const history = DB.getBorrowHistory();
+  const record  = history[borrowIdx];
+  if (!record || record.returnedAt) return;
+
+  // Tandai sudah dikembalikan
+  record.returnedAt = Date.now();
+  const key = `bk_borrow_${STATE.currentUser.nim}`;
+  localStorage.setItem(key, JSON.stringify(history));
+
+  // Update status buku kembali menjadi tersedia
+  const books = DB.getBooks();
+  const book  = books.find(b => b.id === record.bookId);
+  if (book) { book.status = 'available'; DB.saveBooks(books); }
+
+  // Catat aktivitas
+  DB.logActivity('return', record.bookId, record.title);
+
+  showToast(`"${record.title}" berhasil dikembalikan.`, 'success');
+  renderHistory();
+}
+
+/* ----------------------------------------------------------------
+   WISHLIST
+   ---------------------------------------------------------------- */
+
+/** Toggle buku masuk/keluar wishlist */
+function toggleWishlist(id) {
+  const list = DB.getWishlist();
+  const idx  = list.indexOf(id);
+  if (idx === -1) {
+    list.push(id);
+    DB.logActivity('wishlist', id, 'add');
+    showToast('Ditambahkan ke wishlist ♥', 'success');
+  } else {
+    list.splice(idx, 1);
+    DB.logActivity('wishlist', id, 'remove');
+    showToast('Dihapus dari wishlist', 'info');
+  }
+  DB.saveWishlist(list);
+
+  // Refresh tampilan jika di halaman wishlist
+  if (STATE.currentPage === 'wishlist') renderWishlist();
+  if (STATE.currentPage === 'catalog')  filterCatalog();
+}
+
+/** Render halaman wishlist */
+function renderWishlist() {
+  const wishlist = DB.getWishlist();
+  const books    = DB.getBooks();
+  const container = document.getElementById('wishlist-container');
+
+  if (wishlist.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        </svg>
+        <p>Wishlist kamu masih kosong.<br>Tambahkan buku dari katalog!</p>
+        <button class="btn btn-primary" style="margin-top:14px" onclick="showPage('catalog')">Lihat Katalog</button>
+      </div>`;
+    return;
+  }
+
+  const items = wishlist.map(id => {
+    const b = books.find(bk => bk.id === id);
+    if (!b) return '';
+    return `
+      <div class="wishlist-item">
+        <div class="wishlist-meta">
+          <div style="width:44px;height:60px;border-radius:6px;background:${b.cover}22;color:${b.cover};display:flex;align-items:center;justify-content:center;font-size:22px">${b.emoji}</div>
+          <div>
+            <div style="font-weight:700">${escHtml(b.title)}</div>
+            <div style="font-size:12px;color:var(--muted)">${escHtml(b.author)} · <span class="book-genre" style="font-size:11px">${escHtml(b.genre)}</span></div>
+            <div style="margin-top:4px">${buildStatusPill(b.status)}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          ${b.status === 'available'
+            ? `<button class="btn btn-primary btn-sm" onclick="openBorrowModal(${b.id})">Pinjam</button>`
+            : ''}
+          <button class="btn btn-ghost btn-sm" onclick="toggleWishlist(${b.id})" style="color:var(--danger)">✕</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  container.innerHTML = `<div class="card"><div class="card-body">${items}</div></div>`;
+}
+
+/* ----------------------------------------------------------------
+   RATING SYSTEM
+   ---------------------------------------------------------------- */
+
+/** Buka modal rating buku */
+function openRateModal(id) {
+  const book = DB.getBooks().find(b => b.id === id);
+  if (!book) return;
+  STATE.pendingRate    = id;
+  STATE.pendingRateVal = DB.getRatings()[id] || 0;
+
+  document.getElementById('modal-rate-body').innerHTML = `
+    <div style="text-align:center;padding:8px 0">
+      <div style="font-size:18px;font-weight:700;margin-bottom:4px">${escHtml(book.title)}</div>
+      <div style="color:var(--muted);font-size:13px;margin-bottom:20px">${escHtml(book.author)}</div>
+      <div class="rating-input" id="rating-stars" style="justify-content:center">
+        ${[1,2,3,4,5].map(i =>
+          `<span id="rstar-${i}" class="${i <= STATE.pendingRateVal ? 'on' : ''}"
+            onmouseover="hoverStar(${i})" onmouseout="resetStarHover()"
+            onclick="selectStar(${i})">★</span>`
+        ).join('')}
+      </div>
+      <div id="star-label" style="margin-top:10px;font-size:13px;color:var(--muted);min-height:20px">
+        ${STATE.pendingRateVal ? starLabel(STATE.pendingRateVal) : 'Pilih bintang di atas'}
+      </div>
+    </div>
+  `;
+  showModal('modal-rate');
+}
+
+/** Efek hover pada bintang rating */
+function hoverStar(val) {
+  [1,2,3,4,5].forEach(i => {
+    document.getElementById(`rstar-${i}`).className = i <= val ? 'on' : '';
+  });
+  document.getElementById('star-label').textContent = starLabel(val);
+}
+
+/** Reset hover bintang ke nilai yang dipilih */
+function resetStarHover() {
+  [1,2,3,4,5].forEach(i => {
+    document.getElementById(`rstar-${i}`).className = i <= STATE.pendingRateVal ? 'on' : '';
+  });
+  document.getElementById('star-label').textContent =
+    STATE.pendingRateVal ? starLabel(STATE.pendingRateVal) : 'Pilih bintang di atas';
+}
+
+/** Set nilai bintang yang dipilih */
+function selectStar(val) {
+  STATE.pendingRateVal = val;
+  resetStarHover();
+}
+
+/** Label deskripsi rating */
+function starLabel(v) {
+  return ['', 'Sangat Buruk 😞', 'Kurang Baik 😕', 'Cukup 😐', 'Bagus 😊', 'Sangat Bagus 🤩'][v] || '';
+}
+
+/** Simpan rating buku */
+function submitRating() {
+  const id  = STATE.pendingRate;
+  const val = STATE.pendingRateVal;
+  if (!val) { showToast('Pilih bintang terlebih dahulu.', 'error'); return; }
+
+  // Simpan rating user
+  const ratings = DB.getRatings();
+  const oldVal  = ratings[id] || 0;
+  ratings[id]   = val;
+  DB.saveRatings(ratings);
+
+  // Perbarui global rating (rata-rata agregat)
+  const global = DB.getGlobalRatings();
+  if (!global[id]) global[id] = { sum: 0, count: 0 };
+  if (oldVal > 0) {
+    // Ganti rating lama
+    global[id].sum -= oldVal;
+    global[id].sum += val;
+  } else {
+    global[id].sum   += val;
+    global[id].count += 1;
+  }
+  DB.saveGlobalRatings(global);
+
+  // Catat aktivitas
+  DB.logActivity('rate', id, `${val} stars`);
+
+  closeModal('modal-rate');
+  showToast(`Rating ${val}⭐ berhasil disimpan!`, 'success');
+
+  if (STATE.currentPage === 'home')    renderHome();
+  if (STATE.currentPage === 'catalog') filterCatalog();
+  if (STATE.currentPage === 'history') renderHistory();
+}
+
+/* ----------------------------------------------------------------
+   HISTORY PAGE
+   ---------------------------------------------------------------- */
+
+/** Ganti sub-tab riwayat */
+function switchHistoryTab(tab) {
+  STATE.historyTab = tab;
+  ['borrow','rating','activity'].forEach(t => {
+    const el = document.getElementById(`history-${t}`);
+    if (el) el.style.display = t === tab ? '' : 'none';
+  });
+  document.querySelectorAll('.page-tab').forEach((btn, i) => {
+    btn.classList.toggle('active', ['borrow','rating','activity'][i] === tab);
+  });
+  renderHistory();
+}
+
+/** Render semua sub-tab riwayat */
+function renderHistory() {
+  renderBorrowHistory();
+  renderRatingHistory();
+  renderActivityLog();
+}
+
+/** Render tabel riwayat peminjaman */
+function renderBorrowHistory() {
+  const el = document.getElementById('history-borrow');
+  if (!el || STATE.historyTab !== 'borrow') return;
+
+  const history = DB.getBorrowHistory();
+  if (history.length === 0) {
+    el.innerHTML = `<div class="empty-state"><p>Belum ada riwayat peminjaman.</p></div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="card table-wrap">
+      <table>
+        <thead><tr>
+          <th>Buku</th><th>Dipinjam</th><th>Tenggat</th><th>Status</th><th>Aksi</th>
+        </tr></thead>
+        <tbody>
+          ${history.map((h, i) => {
+            const isOverdue = !h.returnedAt && Date.now() > h.dueDate;
+            const statusHtml = h.returnedAt
+              ? `<span class="status-pill pill-green">Dikembalikan</span>`
+              : isOverdue
+                ? `<span class="status-pill pill-red">Terlambat</span>`
+                : `<span class="status-pill pill-blue">Dipinjam</span>`;
+            const actBtn = !h.returnedAt
+              ? `<button class="btn btn-secondary btn-sm" onclick="returnBook(${i})">Kembalikan</button>`
+              : `<button class="btn btn-ghost btn-sm" onclick="openRateModal(${h.bookId})">⭐ Rating</button>`;
+            return `
+              <tr>
+                <td>
+                  <div style="font-weight:600;font-size:13px">${escHtml(h.title)}</div>
+                  <div style="font-size:11px;color:var(--muted)">${escHtml(h.author)}</div>
+                </td>
+                <td style="white-space:nowrap">${formatDate(h.borrowedAt)}</td>
+                <td style="white-space:nowrap;color:${!h.returnedAt && isOverdue ? 'var(--danger)' : ''}">${formatDate(h.dueDate)}</td>
+                <td>${statusHtml}</td>
+                <td>${actBtn}</td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+/** Render tabel rating yang sudah diberikan */
+function renderRatingHistory() {
+  const el = document.getElementById('history-rating');
+  if (!el || STATE.historyTab !== 'rating') return;
+
+  const ratings = DB.getRatings();
+  const books   = DB.getBooks();
+  const keys    = Object.keys(ratings).map(Number);
+
+  if (keys.length === 0) {
+    el.innerHTML = `<div class="empty-state"><p>Belum ada rating yang diberikan.</p></div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="card table-wrap">
+      <table>
+        <thead><tr><th>Buku</th><th>Genre</th><th>Rating Kamu</th><th>Aksi</th></tr></thead>
+        <tbody>
+          ${keys.map(id => {
+            const b = books.find(bk => bk.id === id);
+            if (!b) return '';
+            return `
+              <tr>
+                <td><div style="font-weight:600">${escHtml(b.title)}</div><div style="font-size:11px;color:var(--muted)">${escHtml(b.author)}</div></td>
+                <td><span class="book-genre">${escHtml(b.genre)}</span></td>
+                <td><span style="color:var(--star);font-size:16px">${'★'.repeat(ratings[id])}<span style="color:var(--border)">${'★'.repeat(5 - ratings[id])}</span></span></td>
+                <td><button class="btn btn-ghost btn-sm" onclick="openRateModal(${id})">Edit</button></td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+/** Render log aktivitas harian */
+function renderActivityLog() {
+  const el = document.getElementById('history-activity');
+  if (!el || STATE.historyTab !== 'activity') return;
+
+  const log = DB.getActivityLog();
+
+  if (log.length === 0) {
+    el.innerHTML = `<div class="empty-state"><p>Belum ada aktivitas tercatat.</p></div>`;
+    return;
+  }
+
+  const typeMap = {
+    view:      ['pill-blue', '👁 Dilihat'],
+    borrow:    ['pill-green','📚 Dipinjam'],
+    return:    ['pill-blue', '↩ Dikembalikan'],
+    rate:      ['pill-warn', '⭐ Dirating'],
+    wishlist:  ['pill-warn', '♥ Wishlist'],
+  };
+
+  el.innerHTML = `
+    <div class="card table-wrap">
+      <table>
+        <thead><tr><th>Waktu</th><th>Aktivitas</th><th>Detail</th></tr></thead>
+        <tbody>
+          ${log.slice(0, 50).map(a => {
+            const [cls, label] = typeMap[a.type] || ['',''];
+            return `
+              <tr>
+                <td style="white-space:nowrap;font-size:12px;color:var(--muted)">${formatDateTime(a.ts)}</td>
+                <td><span class="status-pill ${cls}">${label}</span></td>
+                <td style="font-size:13px">${escHtml(a.detail)}</td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+/* ----------------------------------------------------------------
+   PROFILE PAGE
+   ---------------------------------------------------------------- */
+
+/** Render halaman profil pengguna */
+function renderProfile() {
+  const u = STATE.currentUser;
+  document.getElementById('p-name').value  = u.name;
+  document.getElementById('p-nim').value   = u.nim;
+  document.getElementById('p-email').value = u.email;
+  document.getElementById('p-major').value = u.major;
+
+  const history  = DB.getBorrowHistory();
+  const ratings  = DB.getRatings();
+  const wishlist = DB.getWishlist();
+  const books    = DB.getBooks();
+
+  // Hitung genre favorit berdasarkan riwayat
+  const genreFreq = {};
+  history.forEach(h => {
+    const b = books.find(bk => bk.id === h.bookId);
+    if (b) genreFreq[b.genre] = (genreFreq[b.genre] || 0) + 1;
+  });
+  const topGenres = Object.entries(genreFreq).sort((a,b) => b[1]-a[1]).slice(0,3);
+
+  // Rata-rata rating yang diberikan user
+  const rvals = Object.values(ratings);
+  const avgRating = rvals.length ? (rvals.reduce((a,b) => a+b, 0) / rvals.length).toFixed(1) : '–';
+
+  document.getElementById('profile-stats').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Total Dipinjam</div>
+        <div style="font-size:22px;font-weight:800;color:var(--accent)">${history.length} buku</div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Avg. Rating Diberikan</div>
+        <div style="font-size:22px;font-weight:800;color:var(--star)">${avgRating} ★</div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Wishlist</div>
+        <div style="font-size:22px;font-weight:800;color:var(--warn)">${wishlist.length} buku</div>
+      </div>
+      ${topGenres.length ? `
+        <div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Genre Favorit</div>
+          ${topGenres.map(([g, c]) => `
+            <div style="margin-bottom:6px">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">
+                <span>${escHtml(g)}</span><span style="color:var(--muted)">${c}x</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width:${Math.min(100,(c/history.length)*100)}%"></div>
+              </div>
+            </div>`).join('')}
+        </div>` : ''}
+    </div>`;
+}
+
+/** Simpan perubahan profil */
+function saveProfile() {
+  const name  = document.getElementById('p-name').value.trim();
+  const email = document.getElementById('p-email').value.trim();
+
+  if (!name) { showToast('Nama tidak boleh kosong.', 'error'); return; }
+  if (!/^\S+@\S+\.\S+$/.test(email)) { showToast('Format email tidak valid.', 'error'); return; }
+
+  // Update user di state
+  STATE.currentUser.name  = name;
+  STATE.currentUser.email = email;
+  DB.saveSession(STATE.currentUser);
+
+  // Update di daftar akun
+  const accounts = DB.getAccounts();
+  const idx = accounts.findIndex(a => a.nim === STATE.currentUser.nim);
+  if (idx !== -1) {
+    accounts[idx].name  = name;
+    accounts[idx].email = email;
+    DB.saveAccounts(accounts);
+  }
+
+  // Perbarui navbar
+  document.getElementById('nav-username').textContent = name.split(' ')[0];
+  document.getElementById('nav-avatar').textContent   = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+
+  showToast('Profil berhasil diperbarui!', 'success');
+}
+
+/* ----------------------------------------------------------------
+   THEME TOGGLE
+   ---------------------------------------------------------------- */
+
+/** Toggle antara tema dark dan light */
+function toggleTheme() {
+  const isDark = document.body.getAttribute('data-theme') === 'dark';
+  const newTheme = isDark ? 'light' : 'dark';
+  document.body.setAttribute('data-theme', newTheme);
+  localStorage.setItem('bk_theme', newTheme);
+
+  // Ganti ikon tema: matahari (light) ↔ bulan (dark)
+  const icon = document.getElementById('theme-icon');
+  if (newTheme === 'light') {
+    icon.innerHTML = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
+  } else {
+    icon.innerHTML = `<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>`;
+  }
+}
+
+/* ----------------------------------------------------------------
+   MODAL HELPERS
+   ---------------------------------------------------------------- */
+
+function showModal(id) {
+  document.getElementById(id).style.display = '';
+}
+function closeModal(id) {
+  document.getElementById(id).style.display = 'none';
+}
+/** Tutup modal jika klik di overlay (di luar .modal) */
+function closeModalOnOverlay(e, id) {
+  if (e.target === document.getElementById(id)) closeModal(id);
+}
+
+/* ----------------------------------------------------------------
+   TOAST NOTIFICATIONS
+   ---------------------------------------------------------------- */
+
+/**
+ * Tampilkan notifikasi toast singkat
+ * @param {string} msg   - pesan yang ditampilkan
+ * @param {'success'|'error'|'info'} type - tipe toast
+ */
+function showToast(msg, type) {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  const icons = { success: '✓', error: '✕', info: 'ℹ' };
+  el.innerHTML = `<span style="font-size:16px">${icons[type] || 'ℹ'}</span> ${escHtml(msg)}`;
+  container.appendChild(el);
+  // Hapus otomatis setelah 3 detik
+  setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 3000);
+}
+
+/* ----------------------------------------------------------------
+   UTILITY FUNCTIONS
+   ---------------------------------------------------------------- */
+
+/** Escape karakter HTML untuk mencegah XSS */
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+/** Format timestamp ke string tanggal lokal */
+function formatDate(ts) {
+  return new Date(ts).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+/** Format timestamp ke string tanggal + waktu */
+function formatDateTime(ts) {
+  return new Date(ts).toLocaleString('id-ID', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+/* ----------------------------------------------------------------
+   KEYBOARD SHORTCUTS
+   ---------------------------------------------------------------- */
+document.addEventListener('keydown', function(e) {
+  // Tekan Escape untuk menutup modal mana pun yang terbuka
+  if (e.key === 'Escape') {
+    ['modal-book','modal-borrow','modal-rate'].forEach(closeModal);
+  }
+});
+
+/* ----------------------------------------------------------------
+   INIT — jalankan saat halaman dimuat
+   ---------------------------------------------------------------- */
+(function init() {
+  // Terapkan tema tersimpan
+  const savedTheme = localStorage.getItem('bk_theme') || 'dark';
+  document.body.setAttribute('data-theme', savedTheme);
+  const icon = document.getElementById('theme-icon');
+  if (savedTheme === 'light' && icon) {
+    icon.innerHTML = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
+  }
+
+  // Cek sesi login yang masih aktif
+  const session = DB.getSession();
+  if (session) {
+    STATE.currentUser = session;
+    bootApp();
+  }
+  // Else: tampilkan auth-screen (sudah default tampil)
+})();
+</script>
+</body>
+</html>
